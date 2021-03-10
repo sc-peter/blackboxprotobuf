@@ -53,6 +53,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._request = None
         self._original_content = None
         self._trailer = None
+        self._is_empty_response = None
 
     def getTabCaption(self):
         """Return message tab caption"""
@@ -124,8 +125,14 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 protobuf_data = content[self._content_info.getBodyOffset():].tostring()
 
             protobuf_data = self.decodePayload(protobuf_data)
-            json_data, self.message_type = blackboxprotobuf.protobuf_to_json(
-                protobuf_data, self.message_type)
+            if self._is_empty_response:
+                # Message was empty, show empty json array
+                # Otherwise protobuf_to_json will fail
+                json_data = '[]'
+                self.message_type = {}
+            else:
+                json_data, self.message_type = blackboxprotobuf.protobuf_to_json(
+                    protobuf_data, self.message_type)
 
             # Save the message type
             self._extender.known_types[message_hash] = self.message_type
@@ -166,6 +173,11 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def decodePayload(self, payload):
         """Add support for decoding a few default methods. Including Base64 and GZIP"""
+        # (re)set encoder
+        self._encoder = None
+        self._is_empty_response = False
+
+        # Try to decompress gzip
         if payload.startswith(bytearray([0x1f, 0x8b, 0x08])):
             gzip_decompress = zlib.decompressobj(-zlib.MAX_WBITS)
             self._encoder = 'gzip'
