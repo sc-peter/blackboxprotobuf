@@ -54,6 +54,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._original_content = None
         self._trailer = None
         self._is_empty_response = None
+        self._next_message = None
 
     def getTabCaption(self):
         """Return message tab caption"""
@@ -124,18 +125,34 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             if protobuf_data is None:
                 protobuf_data = content[self._content_info.getBodyOffset():].tostring()
 
-            protobuf_data = self.decodePayload(protobuf_data)
-            if self._is_empty_response:
-                # Message was empty, show empty json array
-                # Otherwise protobuf_to_json will fail
-                json_data = '[]'
-                self.message_type = {}
-            else:
-                json_data, self.message_type = blackboxprotobuf.protobuf_to_json(
-                    protobuf_data, self.message_type)
+            json_data = ''
+            # Process multiple messages, limited to max 10 currently
+            msg_id = 1
+            MSG_LIMIT = 10
+            while msg_id < MSG_LIMIT:
+                protobuf_data = self.decodePayload(protobuf_data)
+                if self._is_empty_response:
+                    # Message was empty, show empty json array
+                    # Otherwise protobuf_to_json will fail
+                    json_data += '[]'
+                    self.message_type = {}
+                else:
+                    msg_data, self.message_type = blackboxprotobuf.protobuf_to_json(
+                        protobuf_data, self.message_type)
+                    json_data += msg_data
+                
+                # Save the message type
+                self._extender.known_types[message_hash] = self.message_type
 
-            # Save the message type
-            self._extender.known_types[message_hash] = self.message_type
+                # Check for more messages
+                if not self._next_message:
+                    break
+                protobuf_data = self._next_message
+                self._next_message = None
+                json_data += ',\n'
+                msg_id += 1
+                if msg_id == MSG_LIMIT:
+                    json_data += '/* WARNING; maximum of ' + str(MSG_LIMIT) + ' messages shown */\n'
 
             if self._trailer:
                 # Append trailer data to editor window
@@ -208,6 +225,15 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         # we're naiively handling only uncompressed payloads
         if len(payload) > 1 + 4 and payload.startswith(bytearray([0x00])): # gRPC has 1 byte flag + 4 byte length
             (message_length,) = struct.unpack_from(">I", payload[1:])
+            if len(payload) > message_length:
+                # might indicate that we have multiple messages in this payload
+                # this is not implemented in encode method currently
+                # store next message(s)
+                self._next_message = payload[(1 + 4 + message_length):]
+
+                # fetch one message, should satisfy following len check and return payload
+                payload = payload[:(1 + 4 + message_length)]
+
             if len(payload) == 1 + 4 + message_length:
                 if self._encoder == 'base64':
                     # This indicates webtext wire format
