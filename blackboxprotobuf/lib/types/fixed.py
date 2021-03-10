@@ -21,7 +21,7 @@ def decode_struct(fmt, buf, pos):
         return struct.unpack(fmt, buf[pos:new_pos])[0], new_pos
     except struct.error as exc:
         six.raise_from(
-            DecoderException("Error deocding format string %s from bytes: %s" % (
+            DecoderException("Error decoding format string %s from bytes: %s" % (
                 fmt, binascii.hexlify(buf[pos:new_pos]))),
             exc)
 
