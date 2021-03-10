@@ -52,6 +52,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._request_content_info = None
         self._request = None
         self._original_content = None
+        self._trailer = None
 
     def getTabCaption(self):
         """Return message tab caption"""
@@ -129,6 +130,16 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             # Save the message type
             self._extender.known_types[message_hash] = self.message_type
 
+            if self._trailer:
+                # Append trailer data to editor window
+                trailer_data = '\n\nTrailer(s):\n'
+                try:
+                    # Just decode the data, looks ok for simple protos
+                    trailer_data += base64.b64decode(self._trailer)[1 + 4:]
+                except Exception as exc:
+                    pass
+                json_data += trailer_data
+
             self._original_json = json_data
             self._text_editor.setText(json_data)
             success = True
@@ -162,9 +173,22 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         # Try to base64 decode
         try:
+            # Check for trailers before decoding the message
+            # Following payload might not match long length trailers
+            trailer_pos = payload.find('gAAAA')  # -1 when not found
+            if trailer_pos > -1:
+                # Remove trailer otherwise base64 decode will fail
+                # Both message and trailer are base64 encoded and then concatenated
+                # (at least for google.rpc.Status trailer over webtext)
+                self._trailer = payload[trailer_pos:]
+                payload = payload[:trailer_pos]
+            if len(payload) == 8 and payload == 'AAAAAAA=':
+                # Indicates all 8 bytes are zero which is a valid empty message (uncompressed)
+                self._is_empty_response = True
+
             protobuf = base64.b64decode(payload)
             self._encoder = 'base64'
-            return protobuf
+            payload = protobuf  # allows for further decoding below, do not return yet
         except Exception as exc:
             pass
 
