@@ -215,7 +215,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 # Indicates all 8 bytes are zero which is a valid empty message (uncompressed)
                 self._is_empty_response = True
 
-            protobuf = base64.b64decode(payload)
+            # protobuf = base64.b64decode(payload)  > sometimes fails for long length webtext responses
+            protobuf = base64.urlsafe_b64decode(payload)
             self._encoder = 'base64'
             payload = protobuf  # allows for further decoding below, do not return yet
         except Exception as exc:
