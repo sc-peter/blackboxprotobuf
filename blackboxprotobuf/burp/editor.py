@@ -162,7 +162,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         # Try to base64 decode
         try:
-            protobuf = base64.b64decode(payload, validate=True)
+            protobuf = base64.b64decode(payload)
             self._encoder = 'base64'
             return protobuf
         except Exception as exc:
