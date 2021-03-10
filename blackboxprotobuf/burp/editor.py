@@ -209,8 +209,13 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if len(payload) > 1 + 4 and payload.startswith(bytearray([0x00])): # gRPC has 1 byte flag + 4 byte length
             (message_length,) = struct.unpack_from(">I", payload[1:])
             if len(payload) == 1 + 4 + message_length:
-                self._encoder = 'gRPC'
+                if self._encoder == 'base64':
+                    # This indicates webtext wire format
+                    self._encoder = 'webtext'
+                else:
+                    self._encoder = 'gRPC'
                 return payload[1 + 4:]
+
         #try:
         #    protobuf = base64.urlsafe_b64decode(payload)
         #    self._encoder = 'base64_url'
@@ -218,7 +223,6 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         #except Exception as exc:
         #    pass
 
-        self._encoder = None
         return payload
 
     def encodePayload(self, payload):
@@ -236,6 +240,11 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         elif self._encoder == 'gRPC':
             message_length = struct.pack(">I", len(payload))
             return bytearray([0x00]) + bytearray(message_length) + payload
+        elif self._encoder == 'webtext':
+            # Basically what base64 + gRPC do above
+            message_length = struct.pack(">I", len(payload))
+            payload = bytearray([0x00]) + bytearray(message_length) + payload
+            return  base64.b64encode(payload)
         else:
             return payload
 
