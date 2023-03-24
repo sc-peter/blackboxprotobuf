@@ -81,7 +81,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                     return result
 
             headers = self._content_info.getHeaders()
-            return self._helpers.buildHttpMessage(headers, str(protobuf_data))
+            return self._helpers.buildHttpMessage(headers, str(base64.b64decode(protobuf_data)))
 
         except Exception as exc:
             self._callbacks.printError(traceback.format_exc())
