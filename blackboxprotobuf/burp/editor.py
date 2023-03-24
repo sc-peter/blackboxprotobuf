@@ -202,6 +202,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         # Try to base64 decode
         try:
+            # Revert Burp unhelpful base64 decoding
+            payload = base64.b64encode(payload)
             # Check for trailers before decoding the message
             # Following payload might not match long length trailers
             trailer_pos = payload.find('gAAAA')  # -1 when not found
