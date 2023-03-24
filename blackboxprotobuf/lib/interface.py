@@ -2,6 +2,7 @@
 
 import json
 import six
+import base64
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.exceptions import TypedefException
@@ -14,6 +15,10 @@ def decode_message(buf, message_type=None):
     """
 
     buf = six.ensure_binary(buf)
+    base64_bytes = base64.b64encode(buf)
+    base64_message = base64_bytes.decode('ascii')
+    if base64_message == "grpc+status0":
+        return {}, {}
     if message_type is None or isinstance(message_type, str):
         if message_type not in known_messages:
             message_type = {}
